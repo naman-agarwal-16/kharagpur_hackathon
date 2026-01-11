@@ -1,7 +1,7 @@
 import os
 
-# PATHS
-BASE_DIR = "D:/kharagpur_hackathon"
+# PATHS - Updated for dev container
+BASE_DIR = "/workspaces/kharagpur_hackathon"
 DATA_DIR = os.path.join(BASE_DIR, "data")
 NOVELS_DIR = os.path.join(DATA_DIR, "novels")
 BACKSTORIES_DIR = os.path.join(DATA_DIR, "backstories")
@@ -13,8 +13,8 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", None)
 USE_LOCAL_LLM = False  # Disabled - using OpenRouter instead
 LLM_PROVIDER = "openrouter"  # Options: "gemini", "openai", "openrouter", "local"
 
-# LLM CONTROL - Set to True to skip LLM entirely and use fallback extraction
-SKIP_LLM_USE_FALLBACK = False  # Disabled - OpenRouter API is working
+# LLM CONTROL - Keep False to always use LLM (avoid fallback to pattern matching)
+SKIP_LLM_USE_FALLBACK = False  # Use LLM for claim extraction, not patterns
 
 # CLAIM DECOMPOSITION SETTINGS
 MAX_CLAIMS_PER_BACKSTORY = 15
