@@ -20,7 +20,7 @@ class GeminiAPIWrapper:
             raise ValueError("GEMINI_API_KEY not set in environment!")
         
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-pro')
+        self.model = genai.GenerativeModel('gemini-2.5-flash')
         self.max_retries = 3
         self.timeout = 30  # seconds
     
