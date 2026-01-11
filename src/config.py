@@ -8,8 +8,8 @@ BACKSTORIES_DIR = os.path.join(DATA_DIR, "backstories")
 RESULTS_DIR = os.path.join(BASE_DIR, "results")
 
 # API SETTINGS
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "your-key-here")
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "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")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", None)
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", None)
 USE_LOCAL_LLM = False  # Disabled - using OpenRouter instead
 LLM_PROVIDER = "openrouter"  # Options: "gemini", "openai", "openrouter", "local"
 

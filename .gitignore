@@ -5,6 +5,11 @@ __pycache__/
 venv/
 .venv/
 
+# Environment variables
+.env
+.env.local
+.env.*.local
+
 # Cache files
 cache/*.db
 
