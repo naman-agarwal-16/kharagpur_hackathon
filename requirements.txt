@@ -1,0 +1,5 @@
+google-genai
+pathway
+python-dotenv
+pandas
+nltk

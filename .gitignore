@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+
+# Cache files
+cache/*.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs (keep structure but not contents)
+logs/*.txt
+
+# OS
+.DS_Store
+Thumbs.db
