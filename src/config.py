@@ -25,8 +25,8 @@ for directory in [RESULTS_DIR, LOGS_DIR, CACHE_DIR]:
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openrouter")  # Options: "groq", "openrouter", "gemini"
 
 # API Keys
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "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")
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "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")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 # Provider-specific settings
