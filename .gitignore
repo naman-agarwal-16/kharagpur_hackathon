@@ -12,6 +12,11 @@ venv/
 
 # Cache files
 cache/*.db
+cache/
+
+# Results (generated outputs)
+results/*.csv
+!results/.gitkeep
 
 # IDE
 .vscode/

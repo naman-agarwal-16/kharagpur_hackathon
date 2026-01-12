@@ -1,4 +1,5 @@
 import pandas as pd
+import re
 from pathlib import Path
 from typing import List, Dict, Any
 
@@ -31,6 +32,53 @@ class DataLoader:
         print(f"[LOADER] Found {len(self.train_df)} training examples")
         print(f"[LOADER] Found {len(self.test_df)} test examples")
         print(f"[LOADER] Found {len(self.novel_files)} novels: {list(self.novel_files.keys())}")
+    
+    def load_backstories(self):
+        """Load training and test dataframes"""
+        return self.train_df, self.test_df
+    
+    def load_novels(self):
+        """Load all novels into a dictionary"""
+        novels = {}
+        for key, path in self.novel_files.items():
+            print(f"[LOADER] Loading novel: {path.name} ({path.stat().st_size // 1024} KB)")
+            with open(path, 'r', encoding='utf-8') as f:
+                text = f.read()
+            
+            # Clean Project Gutenberg header/footer
+            text = self._clean_gutenberg_text(text)
+            novels[key] = text
+            print(f"[LOADER] Loaded {len(text):,} characters")
+        
+        return novels
+    
+    def _clean_gutenberg_text(self, text: str) -> str:
+        """Remove Project Gutenberg header and footer"""
+        # Remove header
+        header_patterns = [
+            r'\*\*\* START OF (THIS|THE) PROJECT GUTENBERG EBOOK.*?\*\*\*',
+            r'START OF THIS PROJECT GUTENBERG.*?(?=\n\n)',
+        ]
+        for pattern in header_patterns:
+            match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
+            if match:
+                text = text[match.end():]
+                print(f"[LOADER] Removed header using pattern: {pattern[:50]}...")
+                break
+        
+        # Remove footer
+        footer_patterns = [
+            r'\*\*\* END OF (THIS|THE) PROJECT GUTENBERG EBOOK.*?\*\*\*',
+            r'End of (the )?Project Gutenberg.*',
+        ]
+        for pattern in footer_patterns:
+            match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
+            if match:
+                text = text[:match.start()]
+                print(f"[LOADER] Removed footer using pattern: {pattern[:50]}...")
+                break
+        
+        return text.strip()
     
     def get_training_examples(self) -> List[Dict[str, Any]]:
         """Load all training examples"""

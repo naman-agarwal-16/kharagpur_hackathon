@@ -1,160 +1,36 @@
 """
-Automatic Testing Loop - Runs tests continuously, waiting for API quota resets
-Logs all results and generates submission when ready
+Clean Auto-Test Loop - Autonomous continuous testing with resume capability
 """
-
-import time
 import os
+import time
 from datetime import datetime
-from pathlib import Path
-from master_pipeline import MasterPipeline
-from data_loader import DataLoader
+from typing import Set
 
-class AutoTester:
-    """Runs tests automatically, handles API limits, logs progress"""
+from config import LOGS_DIR, TEST_BATCH_SIZE, AUTO_WAIT_ON_RATE_LIMIT, RATE_LIMIT_WAIT_HOURS
+from master_pipeline import NarrativeConsistencyPipeline
+
+
+class AutoTestLoop:
+    """
+    Autonomous testing system that:
+    - Tests training examples one by one
+    - Saves progress continuously
+    - Can resume from where it left off
+    - Handles API rate limits gracefully
+    """
     
     def __init__(self):
-        self.log_dir = Path("D:/kharagpur_hackathon/logs")
-        self.log_dir.mkdir(exist_ok=True)
+        self.pipeline = NarrativeConsistencyPipeline()
+        self.log_file = os.path.join(LOGS_DIR, "auto_test_results.txt")
         
-        self.pipeline = MasterPipeline()
-        self.loader = DataLoader()
-        
-        # Load all data once
-        print("[AUTO] Loading all training data...")
-        self.train_df = self.loader.train_df
-        self.test_df = self.loader.test_df
-        
-        print(f"[AUTO] Loaded {len(self.train_df)} training examples")
-        print(f"[AUTO] Loaded {len(self.test_df)} test examples")
-        
-        # Track progress
-        self.results_file = self.log_dir / "auto_test_results.txt"
-        self.tested_ids = set()
-        self.load_progress()
-    
-    def load_progress(self):
-        """Load previously tested IDs"""
-        if self.results_file.exists():
-            with open(self.results_file, 'r') as f:
-                for line in f:
-                    if line.startswith("Story"):
-                        try:
-                            story_id = int(line.split()[1].rstrip(':'))
-                            self.tested_ids.add(story_id)
-                        except:
-                            pass
-            print(f"[AUTO] Resumed - already tested {len(self.tested_ids)} examples")
-    
-    def log_result(self, story_id, predicted, actual, confidence, rationale):
-        """Append result to log file"""
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with open(self.results_file, 'a') as f:
-            f.write(f"\n[{timestamp}] Story {story_id}: Pred={predicted}, Actual={actual}, Conf={confidence:.2f}\n")
-            f.write(f"  Rationale: {rationale}\n")
-    
-    def run_batch(self, batch_size=5):
-        """Run a batch of tests (reduced to avoid rate limits)"""
-        
-        # Get untested IDs
-        all_ids = set(self.train_df['id'].values)
-        remaining = list(all_ids - self.tested_ids)
-        
-        if not remaining:
-            print("[AUTO] ✓ All training examples tested!")
-            return True
-        
-        # Take next batch
-        batch = remaining[:batch_size]
-        
-        print(f"\n{'='*70}")
-        print(f"[AUTO] Testing batch of {len(batch)} examples...")
-        print(f"[AUTO] Remaining: {len(remaining)} / {len(all_ids)}")
-        print(f"{'='*70}\n")
-        
-        results = []
-        api_limit_hit = False
-        
-        for story_id in batch:
-            try:
-                result = self.pipeline.process_example(story_id)
-                
-                # Check if we hit rate limit
-                if 'rate_limited' in str(result.get('rationale', '')).lower():
-                    print(f"[AUTO] ⚠️ Rate limit detected on story {story_id}")
-                    api_limit_hit = True
-                    break
-                
-                # Log result
-                self.log_result(
-                    story_id,
-                    result['prediction'],
-                    result.get('actual_label', 'unknown'),
-                    result['confidence'],
-                    result['rationale']
-                )
-                
-                self.tested_ids.add(story_id)
-                results.append(result)
-                
-                print(f"[AUTO] ✓ Completed {len(self.tested_ids)}/{len(all_ids)}")
-                
-                # Delay between tests to avoid rate limits
-                time.sleep(5)
-                
-            except Exception as e:
-                print(f"[AUTO] ✗ Error on story {story_id}: {e}")
-                if '429' in str(e) or 'quota' in str(e).lower():
-                    api_limit_hit = True
-                    break
-        
-        # Calculate accuracy
-        if results:
-            correct = sum(1 for r in results 
-                         if r.get('actual_label') is not None and 
-                         r['prediction'] == int(r['actual_label']))
-            accuracy = correct / len(results) * 100 if results else 0
-            print(f"\n[AUTO] Batch Accuracy: {correct}/{len(results)} = {accuracy:.1f}%")
-        
-        return api_limit_hit
-    
-    def wait_for_quota_reset(self, wait_hours=12):
-        """Wait for API quota to reset"""
-        wait_seconds = wait_hours * 3600
-        
-        print(f"\n{'='*70}")
-        print(f"[AUTO] 😴 API quota exhausted. Waiting {wait_hours} hours for reset...")
-        print(f"[AUTO] Will resume at {datetime.now().replace(hour=(datetime.now().hour + wait_hours) % 24).strftime('%I:%M %p')}")
-        print(f"{'='*70}\n")
-        
-        # Log to file
-        with open(self.results_file, 'a') as f:
-            f.write(f"\n[{datetime.now()}] Waiting {wait_hours}h for quota reset...\n")
-        
-        # Wait with progress updates
-        intervals = 20
-        for i in range(intervals):
-            time.sleep(wait_seconds / intervals)
-            elapsed = (i + 1) / intervals * 100
-            remaining_hours = wait_hours * (1 - (i + 1) / intervals)
-            print(f"[AUTO] Progress: {elapsed:.0f}% | Remaining: {remaining_hours:.1f}h", end='\r')
-        
-        print(f"\n[AUTO] ⏰ Quota should be reset now. Resuming tests...\n")
-    
-    def generate_submission(self):
-        """Generate final submission file for test set"""
-        print("\n" + "="*70)
-        print("[AUTO] Generating test set predictions...")
-        print("="*70 + "\n")
-        
-        submission_path = "D:/kharagpur_hackathon/results/submission.csv"
-        self.pipeline.generate_submission(submission_path)
-        
-        print(f"[AUTO] ✓ Submission saved to {submission_path}")
+        # Ensure log directory exists
+        os.makedirs(LOGS_DIR, exist_ok=True)
     
     def run_forever(self):
-        """Main loop - run until all training examples tested"""
-        
+        """
+        Run continuous testing until all examples are processed
+        Automatically waits and retries if API rate limits hit
+        """
         print("\n" + "="*70)
         print("🤖 AUTOMATIC TESTING MODE STARTED")
         print("="*70)
@@ -162,36 +38,168 @@ class AutoTester:
         print("[AUTO] Press Ctrl+C to stop")
         print("="*70 + "\n")
         
-        try:
-            while True:
-                # Run batch
-                api_limit_hit = self.run_batch(batch_size=10)
+        while True:
+            try:
+                api_limit_hit = self.run_batch(batch_size=TEST_BATCH_SIZE)
                 
-                # Check if done
-                all_ids = set(self.train_df['id'].values)
-                if len(self.tested_ids) >= len(all_ids):
+                # Check if all examples are tested
+                tested_ids = self._load_tested_ids()
+                total_examples = len(self.pipeline.train_df)
+                remaining = total_examples - len(tested_ids)
+                
+                if remaining == 0:
                     print("\n" + "="*70)
-                    print("🎉 ALL TRAINING EXAMPLES TESTED!")
-                    print("="*70 + "\n")
+                    print("✓ ALL TRAINING EXAMPLES TESTED!")
+                    print("="*70)
                     
-                    # Generate submission
-                    self.generate_submission()
+                    # Generate submission for test set
+                    print("\n[AUTO] Generating test set predictions...")
+                    self.pipeline.generate_submission()
+                    
+                    print("\n[AUTO] ✓ Complete! Check results/ for submission.csv")
                     break
                 
-                # If hit rate limit, wait
-                if api_limit_hit:
-                    self.wait_for_quota_reset(wait_hours=12)
-                else:
-                    # Small delay between batches
-                    time.sleep(10)
+                # If API rate limit hit, wait and retry
+                if api_limit_hit and AUTO_WAIT_ON_RATE_LIMIT:
+                    self.wait_for_quota_reset(RATE_LIMIT_WAIT_HOURS)
+                elif api_limit_hit:
+                    print("\n[AUTO] API rate limit hit. Exiting. Re-run to resume.")
+                    break
+                    
+            except KeyboardInterrupt:
+                print("\n\n[AUTO] ⚠️ Stopped by user")
+                print(f"[AUTO] Progress saved to {self.log_file}")
+                break
+            except Exception as e:
+                print(f"\n[AUTO] ✗ Unexpected error: {e}")
+                print("[AUTO] Waiting 60 seconds before retry...")
+                time.sleep(60)
+    
+    def run_batch(self, batch_size: int = 5) -> bool:
+        """
+        Run a batch of test examples
         
-        except KeyboardInterrupt:
-            all_ids = set(self.train_df['id'].values)
-            print("\n[AUTO] ⚠️ Stopped by user")
-            print(f"[AUTO] Progress: {len(self.tested_ids)}/{len(all_ids)} examples tested")
-            print(f"[AUTO] Resume anytime - progress saved to {self.results_file}")
-
-
-if __name__ == "__main__":
-    tester = AutoTester()
-    tester.run_forever()
+        Returns:
+            True if API rate limit was hit, False otherwise
+        """
+        # Load already tested IDs
+        tested_ids = self._load_tested_ids()
+        
+        # Get untested examples
+        untested_df = self.pipeline.train_df[~self.pipeline.train_df['id'].isin(tested_ids)]
+        
+        if len(untested_df) == 0:
+            print("[AUTO] All examples already tested!")
+            return False
+        
+        print("\n" + "="*70)
+        print(f"[AUTO] Testing batch of {batch_size} examples...")
+        print(f"[AUTO] Remaining: {len(untested_df)} / {len(self.pipeline.train_df)}")
+        print("="*70 + "\n")
+        
+        # Process batch
+        batch_df = untested_df.head(batch_size)
+        results = []
+        api_limit_hit = False
+        
+        for _, row in batch_df.iterrows():
+            story_id = row['id']
+            
+            try:
+                result = self.pipeline.process_single_story(
+                    story_id=story_id,
+                    backstory=row['content'],
+                    character=row['char'],
+                    novel_name=row['book_name'],
+                    actual_label=row['label']
+                )
+                
+                # Save result immediately
+                self._save_result(result)
+                results.append(result)
+                
+                print(f"[AUTO] ✓ Completed {len(tested_ids) + len(results)}/{len(self.pipeline.train_df)}")
+                
+            except Exception as e:
+                error_msg = str(e)
+                print(f"[AUTO] ✗ Error on story {story_id}: {e}")
+                
+                # Check if it's a rate limit error
+                if '429' in error_msg or 'quota' in error_msg.lower() or 'rate limit' in error_msg.lower():
+                    api_limit_hit = True
+                    break
+                
+                # Save failed result
+                self._save_result({
+                    'id': story_id,
+                    'prediction': 0,
+                    'actual_label': row['label'],
+                    'confidence': 0.5,
+                    'rationale': f"Error: {str(e)[:100]}"
+                })
+                results.append({'id': story_id, 'prediction': 0, 'actual_label': row['label']})
+        
+        # Calculate and print batch accuracy
+        if results:
+            correct = sum(1 for r in results 
+                         if r.get('actual_label') is not None 
+                         and r['prediction'] == int(r['actual_label']))
+            accuracy = correct / len(results) * 100 if results else 0
+            print(f"\n[AUTO] Batch Accuracy: {correct}/{len(results)} = {accuracy:.1f}%")
+        
+        return api_limit_hit
+    
+    def wait_for_quota_reset(self, wait_hours: int = 12):
+        """Wait for API quota to reset"""
+        print("\n" + "="*70)
+        print(f"⏰ API RATE LIMIT HIT - Waiting {wait_hours} hours for quota reset")
+        print("="*70)
+        
+        wait_seconds = wait_hours * 3600
+        end_time = time.time() + wait_seconds
+        
+        while time.time() < end_time:
+            remaining = int(end_time - time.time())
+            hours = remaining // 3600
+            minutes = (remaining % 3600) // 60
+            print(f"\r[AUTO] Time remaining: {hours}h {minutes}m", end="", flush=True)
+            time.sleep(60)  # Update every minute
+        
+        print("\n[AUTO] ✓ Quota should be reset. Resuming testing...")
+    
+    def _load_tested_ids(self) -> Set[int]:
+        """Load IDs of already tested examples from log file"""
+        tested_ids = set()
+        
+        if not os.path.exists(self.log_file):
+            return tested_ids
+        
+        try:
+            with open(self.log_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.startswith("Story"):
+                        # Extract ID from line like "Story 1: Pred=0, Actual=1.0..."
+                        parts = line.split(':')[0].split()
+                        if len(parts) >= 2:
+                            story_id = int(parts[1])
+                            tested_ids.add(story_id)
+        except Exception as e:
+            print(f"[WARN] Error loading tested IDs: {e}")
+        
+        return tested_ids
+    
+    def _save_result(self, result: dict):
+        """Append result to log file"""
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        log_line = (
+            f"Story {result['id']}: "
+            f"Pred={result['prediction']}, "
+            f"Actual={result.get('actual_label', 'N/A')}, "
+            f"Conf={result.get('confidence', 0.5):.2f}, "
+            f"Rationale={result.get('rationale', 'N/A')[:50]}, "
+            f"Time={timestamp}\n"
+        )
+        
+        with open(self.log_file, 'a', encoding='utf-8') as f:
+            f.write(log_line)

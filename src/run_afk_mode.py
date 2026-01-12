@@ -1,27 +1,32 @@
 """
-AFK MODE LAUNCHER
-Leave this running and it will automatically:
-1. Test all training examples
-2. Wait for API quota resets
-3. Generate submission file when done
+Run AFK (Away From Keyboard) Mode
+Continuously tests all training examples and generates submission
 """
+import sys
+import os
 
-print("""
-╔════════════════════════════════════════════════════════════════╗
-║                    AFK AUTO-TEST MODE                          ║
-║                                                                 ║
-║  🤖 System will run continuously until all examples tested     ║
-║  ⏰ Automatically waits for API quota resets (12 hours)       ║
-║  📊 Progress logged to logs/auto_test_results.txt             ║
-║  💾 Can resume anytime - progress is saved                     ║
-║  🎯 Generates submission.csv when training complete            ║
-║                                                                 ║
-║  Press Ctrl+C to stop                                          ║
-╚════════════════════════════════════════════════════════════════╝
-""")
+# Add src to path if needed
+sys.path.insert(0, os.path.dirname(__file__))
 
-from auto_test_loop import AutoTester
+from auto_test_loop import AutoTestLoop
+
+
+def print_banner():
+    print("\n╔════════════════════════════════════════════════════════════════╗")
+    print("║                    AFK AUTO-TEST MODE                          ║")
+    print("║                                                                 ║")
+    print("║  🤖 System will run continuously until all examples tested     ║")
+    print("║  ⏰ Automatically waits for API quota resets (12 hours)       ║")
+    print("║  📊 Progress logged to logs/auto_test_results.txt             ║")
+    print("║  💾 Can resume anytime - progress is saved                     ║")
+    print("║  🎯 Generates submission.csv when training complete            ║")
+    print("║                                                                 ║")
+    print("║  Press Ctrl+C to stop                                          ║")
+    print("╚════════════════════════════════════════════════════════════════╝\n")
+
 
 if __name__ == "__main__":
-    tester = AutoTester()
+    print_banner()
+    
+    tester = AutoTestLoop()
     tester.run_forever()
